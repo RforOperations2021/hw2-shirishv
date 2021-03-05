@@ -1,14 +1,5 @@
 # importing required libraries
 
-# installing/loading the package
-if(!require(installr)) {
-  install.packages("installr"); 
-  require(installr)
-}
-
-# using the package bcz shiny, shiythemes were built on R 3.6.3
-# updateR()
-
 library(shiny)
 library(shinydashboard)
 library(reshape2)
@@ -27,10 +18,10 @@ colnames(pnr)[12] <- "Average.Utilization"
 pdf(NULL)
 
 # Application title ----------------------------------------------
-header <- dashboardHeader(title = "Port Authority Park & Ride Dashboard")
+header <- dashboardHeader(title = "PAAC Park & Ride Dashboard", titleWidth = 300)
 
 # Dashboard sidebar
-sidebar <- dashboardSidebar(
+sidebar <- dashboardSidebar(width = 300,
   sidebarMenu(
     id = "tabs",
     
@@ -45,7 +36,7 @@ sidebar <- dashboardSidebar(
     # Inputs: selecting variables to plot ------------------------------
     # Input for y-axis of the plot
     selectInput("Metric",
-                "Total # lots/spaces:",
+                "Total # parking lots/spaces:",
                 choices = c("Count of Lots", "Count of Parking Spaces"),
                 selected = "Count of Lots"),
     
@@ -54,7 +45,11 @@ sidebar <- dashboardSidebar(
                 "Group Park & Rides by:",
                 choices = c("Region","Municipality","Ownership",
                             "General Ownership" = "General.Ownership"),
-                selected = "Region")
+                selected = "Region"),
+    
+    # Checkbox to filter lots in status bar
+    uiOutput("filter")
+    
   )
 )
 
@@ -65,10 +60,9 @@ body <- dashboardBody(tabItems(
   tabItem("plot",
           
           # Value Boxes ----------------------------------------------
-          fluidRow(
-            valueBoxOutput("lots"),
-            valueBoxOutput("spaces"),
-            valueBoxOutput("utilization")
+          fluidRow(valueBoxOutput("lots"),
+                   valueBoxOutput("spaces"),
+                   valueBoxOutput("utilization")
           ),
           
           # Plot ----------------------------------------------
@@ -76,7 +70,7 @@ body <- dashboardBody(tabItems(
             tabBox(title = "Plots",
                    width = 12,
                    tabPanel("Distribution of Park & Ride lots", plotlyOutput("barplot")),
-                   tabPanel("Lots Utilization", plotlyOutput("plot_height")))
+                   tabPanel("Lots Utilization", plotlyOutput("statusbar", height = "90vh")))
           )
   ),
   
@@ -148,6 +142,34 @@ server <- function(input, output) {
       theme(axis.text.x = element_text(angle = ifelse(input$Location == "Municipality",45,0))) +
       theme(legend.title = element_text(size = ifelse(input$Location == "General.Ownership", 8, 10)))
   })
+  
+  # Creating a checkbox UI to place in sidebar using inputs
+  output$filter <- renderUI({
+    checkboxGroupInput("filter",
+                       "Filter lot utilization status bar using:",
+                       choices = unique(pnr[,input$Location]),
+                       selected = unique(pnr[,input$Location]))
+  })
+  
+  # Creating a subset based on the checkbox
+  filtered.df <- reactive({
+    req(input$filter)
+    pnr[pnr[,input$Location] %in% input$filter, ]
+  })
+  
+  # Making a status bar type bar plot showing utilization rate of each parking lot
+  output$statusbar <- renderPlotly({
+      ggplot(data = filtered.df()) +
+        geom_bar(stat = "identity", fill = "#eeeeee", aes(x = Name, y = 1)) +
+        geom_bar(stat = "identity", fill = ifelse(filtered.df()$Average.Utilization >= 0.75, "#2dc937", 
+                                                  ifelse(filtered.df()$Average.Utilization >= 0.40, "#e7b416", "#cc3232")), 
+                 aes(x = Name, y = Average.Utilization)) +
+        theme_bw() +
+        scale_y_continuous(labels = scales::percent) +
+        labs(x = "Parking Lot Names", y = " Average Monthly Utilization Rate in 2020") +
+        coord_flip()
+  })
+  
   
   # Aggregated Data table ----------------------------------------------
   output$agg.table <- DT::renderDataTable({pnrInput.new()})
