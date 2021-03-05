@@ -1,5 +1,12 @@
 # importing required libraries
 
+# install.packages("bindrcpp")
+# if(!requireNamespace("devtools")) install.packages("devtools")
+# devtools::install_github("dkahle/ggmap", ref = "tidyup")
+
+# install.packages(ggmap)
+# install.packages("dashboardthemes")
+
 library(shiny)
 library(shinydashboard)
 library(reshape2)
@@ -7,6 +14,9 @@ library(dplyr)
 library(plotly)
 library(shinythemes)
 library(tools)
+library(ggmap)
+
+register_google(key = "AIzaSyDGLYamQykg8ejoSKVfnLVO4zMyX_Mi8Bw")
 
 # loading the Park and Ride dataset
 
@@ -47,6 +57,14 @@ sidebar <- dashboardSidebar(width = 300,
                             "General Ownership" = "General.Ownership"),
                 selected = "Region"),
     
+    # Input for lower and upper value of utilization for medium utilization
+    sliderInput(inputId = "slider", 
+                label = "Select the range of utilization for medium performance (orange):", 
+                min = 0, 
+                max = 1,
+                step = 0.05, 
+                value = c(0.40,0.75)),
+    
     # Checkbox to filter lots in status bar
     uiOutput("filter")
     
@@ -69,8 +87,9 @@ body <- dashboardBody(tabItems(
           fluidRow(
             tabBox(title = "Plots",
                    width = 12,
-                   tabPanel("Distribution of Park & Ride lots", plotlyOutput("barplot")),
-                   tabPanel("Lots Utilization", plotlyOutput("statusbar", height = "90vh")))
+                   tabPanel(strong("How is the distribution of Park & Ride lots look like?"), plotlyOutput("barplot")),
+                   tabPanel(strong("What are lots' utilization rates?"), plotlyOutput("statusbar", height = "90vh")),
+                   tabPanel(strong("Where are all the lots located?"), plotlyOutput("map", height = "70vh")))
           )
   ),
   
@@ -90,7 +109,7 @@ body <- dashboardBody(tabItems(
 )
 
 # UI
-ui <- dashboardPage(header, sidebar, body)
+ui <- dashboardPage(skin = "green", header, sidebar, body)
 
 # Defining server function required to create plots and value boxes -----
 server <- function(input, output) {
@@ -116,20 +135,20 @@ server <- function(input, output) {
   output$lots <- renderValueBox({
     num <- nrow(pnr)
     
-    valueBox(subtitle = "Total lots", value = num, icon = icon("parking"), color = "orange")
+    valueBox(subtitle = "Total lots", value = num, icon = icon("parking"), color = "blue")
   })
   
   output$spaces <- renderValueBox({
     num <- sum(pnr$Capacity)
     
-    valueBox(subtitle = "Total spaces", value = num, icon = icon("car-side"), color = "orange")
+    valueBox(subtitle = "Total spaces", value = num, icon = icon("car-side"), color = "blue")
   })
   
   output$utilization <- renderValueBox({
     num <- pnr %>%
       summarise(paste(round(sum(Average.Use.2020)*100/sum(Capacity),2),"%"))
     
-    valueBox(subtitle = "Monthy average utilization", value = num, icon = icon("hourglass-half"), color = "orange")
+    valueBox(subtitle = "Monthy average utilization", value = num, icon = icon("chart-bar"), color = "blue")
   })
   
   # Making a bar plot to show count of lots across different geographic divisions
@@ -140,7 +159,9 @@ server <- function(input, output) {
            fill = gsub("\\.", " ", input$Location)) +
       theme_bw() +
       theme(axis.text.x = element_text(angle = ifelse(input$Location == "Municipality",45,0))) +
-      theme(legend.title = element_text(size = ifelse(input$Location == "General.Ownership", 8, 10)))
+      theme(legend.title = element_text(size = ifelse(input$Location == "General.Ownership", 8, 10))) +
+      theme(axis.title.x = element_text(face = "bold"), 
+            axis.title.y = element_text(face = "bold"))
   })
   
   # Creating a checkbox UI to place in sidebar using inputs
@@ -161,13 +182,26 @@ server <- function(input, output) {
   output$statusbar <- renderPlotly({
       ggplot(data = filtered.df()) +
         geom_bar(stat = "identity", fill = "#eeeeee", aes(x = Name, y = 1)) +
-        geom_bar(stat = "identity", fill = ifelse(filtered.df()$Average.Utilization >= 0.75, "#2dc937", 
-                                                  ifelse(filtered.df()$Average.Utilization >= 0.40, "#e7b416", "#cc3232")), 
+        geom_bar(stat = "identity", 
+                 fill = ifelse(filtered.df()$Average.Utilization >= input$slider[2], "#2dc937", 
+                               ifelse(filtered.df()$Average.Utilization >= input$slider[1], "#e7b416", "#cc3232")), 
                  aes(x = Name, y = Average.Utilization)) +
         theme_bw() +
         scale_y_continuous(labels = scales::percent) +
         labs(x = "Parking Lot Names", y = " Average Monthly Utilization Rate in 2020") +
+        theme(axis.title.x = element_text(face = "bold"), 
+              axis.title.y = element_text(face = "bold")) +
         coord_flip()
+  })
+  
+  # Plotting map containing locations of Park & Rides
+  output$map <- renderPlotly({
+    map <- get_map(location = "pittsburgh", zoom = 10, source = "google", maptype = "roadmap")
+    ggmap(map) +
+      geom_point(data = pnr, aes(x = Longitude, y = Latitude), color = "navy", size = 2) +
+      labs(x = "Longitude", y = "Latitude") +
+      theme(axis.title.x = element_text(face = "bold"), 
+            axis.title.y = element_text(face = "bold"))
   })
   
   
