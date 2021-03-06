@@ -88,7 +88,7 @@ body <- dashboardBody(tabItems(
             tabBox(title = "Plots",
                    width = 12,
                    tabPanel(strong("How is the distribution of Park & Ride lots look like?"), plotlyOutput("barplot")),
-                   tabPanel(strong("What are lots' utilization rates?"), plotlyOutput("statusbar", height = "90vh")),
+                   tabPanel(strong("What are lots' utilization rates?"), plotlyOutput("statusbar", height = "700")),
                    tabPanel(strong("Where are all the lots located?"), plotlyOutput("map", height = "70vh")))
           )
   ),
@@ -198,7 +198,7 @@ server <- function(input, output) {
   output$map <- renderPlotly({
     map <- get_map(location = "pittsburgh", zoom = 10, source = "google", maptype = "roadmap")
     ggmap(map) +
-      geom_point(data = pnr, aes(x = Longitude, y = Latitude), color = "navy", size = 2) +
+      geom_point(data = filtered.df(), aes_string(x = "Longitude", y = "Latitude", color = input$Location), size = 2) +
       labs(x = "Longitude", y = "Latitude") +
       theme(axis.title.x = element_text(face = "bold"), 
             axis.title.y = element_text(face = "bold"))
