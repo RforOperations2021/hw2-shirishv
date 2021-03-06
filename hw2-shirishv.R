@@ -16,7 +16,9 @@ library(shinythemes)
 library(tools)
 library(ggmap)
 
-register_google(key = "AIzaSyDGLYamQykg8ejoSKVfnLVO4zMyX_Mi8Bw")
+key <- read.table("google_key.txt", header = FALSE, as.is = TRUE)
+
+register_google(key = key[1,1])
 
 # loading the Park and Ride dataset
 
