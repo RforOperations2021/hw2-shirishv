@@ -200,7 +200,8 @@ server <- function(input, output) {
   output$map <- renderPlotly({
     map <- get_map(location = "pittsburgh", zoom = 10, source = "google", maptype = "roadmap")
     ggmap(map) +
-      geom_point(data = filtered.df(), aes_string(x = "Longitude", y = "Latitude", color = input$Location), size = 2) +
+      geom_point(data = filtered.df(), aes_string(x = "Longitude", y = "Latitude", color = input$Location, 
+                                                  size = "Average.Utilization", text = "Name")) +
       labs(x = "Longitude", y = "Latitude") +
       theme(axis.title.x = element_text(face = "bold"), 
             axis.title.y = element_text(face = "bold"))
